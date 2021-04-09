@@ -1,6 +1,7 @@
 <!-- ![alt-text-1]("title-1") ![alt-text-2](image2.png "title-2") -->
 The implementation of NAACL 2021 paper 
 ["Event Representation with Sequential, Semi-Supervised Discrete Variables".](https://arxiv.org/pdf/2010.04361.pdf)
+
 <img src="figs/model_structure.png" width="600" height="200"/><img src="figs/example_final.png" width="400"/> 
 
 This Pytorch code implements the model and reproduces the results from the paper.
