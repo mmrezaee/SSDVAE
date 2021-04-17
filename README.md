@@ -36,4 +36,4 @@ This Pytorch code implements the model and reproduces the results from the paper
 ```
 
 # Disclaimer
-Some parts of the code were inspired by [HAQAE](https://github.com/StonyBrookNLP/HAQAE) Implementations.
+Some parts of the code were inspired by [HAQAE](https://github.com/StonyBrookNLP/HAQAE) implementations.
