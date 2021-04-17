@@ -35,3 +35,5 @@ This Pytorch code implements the model and reproduces the results from the paper
 ./nyt_inv_narr.sh $obsv_prob $exp_num $seed $data_mode
 ```
 
+# Disclaimer
+Some parts of the code were inspired by [HAQAE](https://github.com/StonyBrookNLP/HAQAE) Implementations.
