@@ -122,7 +122,7 @@ class LatentNode(nn.Module):
         # print("one_hot_after: ",one_hot.size())
         return one_hot  
 
-    def infer_(self, input_memory, input_lens, init_query=None,f_vals=None,template_input=None):
+    def infer_(self, input_memory, input_lens, init_query=None,f_vals=None):
         """
         Calculate the current value of Z for this variable (deterministic sample),
         given the values of parents and the input memory, then update this variables value
@@ -147,7 +147,6 @@ class LatentNode(nn.Module):
             fval_one_hot=self.frames_onehot(f_val_child)        
             prev_latent = self.parents[0].value #propogate decoder loss back through attn and any previous attns
             V, scores, frame_to_frame, vocab_to_frame = self.attn(prev_latent, input_memory, input_lens) #unnormalized gumbel parameter
-            V += template_input
 
         else:
             root_row = 0
@@ -157,10 +156,9 @@ class LatentNode(nn.Module):
             l_c = Variable((f_val_root>2).view((-1,1))).float()            
             fval_one_hot = self.frames_onehot(f_val_root)
             V, scores , frame_to_frame, vocab_to_frame= self.attn(init_query, input_memory, input_lens) #unnormalized gumbel parameter
-            V += template_input
 
         V_raw= V
-        V=(1-l_o)*V+(l_o*torch.norm(V)* fval_one_hot.squeeze(0))
+        V=V+(l_o*torch.norm(V)* fval_one_hot.squeeze(0))
 
         gumbel_samples = torch.nn.functional.gumbel_softmax(logits=V,tau=torch.tensor([self.tau]).cuda())
         self.frame_classifier = 0.1*l_c*self.LogSoftmax(V_raw)*fval_one_hot.squeeze(0)
@@ -189,19 +187,19 @@ class LatentNode(nn.Module):
 
 
 
-    def infer_all_(self, input_memory, input_lens, init_query=None,f_vals=None,template_input=None):
+    def infer_all_(self, input_memory, input_lens, init_query=None,f_vals=None):
         """
         Call infer recusivly down the tree, starting from this node
         Args:
             memory (FloatTensor, [batch, seq_len, dim]) : The input encoder states (what is attended to)
             f_vals [batch,num_clauses]
         """
-        self.infer_(input_memory, input_lens, init_query,f_vals,template_input=template_input)
+        self.infer_(input_memory, input_lens, init_query,f_vals)
         for idx_child,child in enumerate(self.children):
-            child.infer_all_(input_memory, input_lens, init_query,f_vals,template_input=template_input)
+            child.infer_all_(input_memory, input_lens, init_query,f_vals)
 
 
-    def forward(self, input_memory, input_lens, init_query,f_vals=None,template_input=None):
+    def forward(self, input_memory, input_lens, init_query,f_vals=None):
         """
         Input lens is a [batch] size Tensor with the lengths of inputs for each batch
         init_query: [batch_size,num_hidden] the average of hiddens from observed tokens
@@ -210,7 +208,7 @@ class LatentNode(nn.Module):
                     of each input and will be used for masking
         f_vals: observed (and not) frames [batch, num_clauses]
         """
-        self.infer_all_(input_memory, input_lens, init_query,f_vals=f_vals,template_input=template_input)
+        self.infer_all_(input_memory, input_lens, init_query,f_vals=f_vals)
         collected = self.collect()
         diffs = self.collect_diffs()
         embs = self.collect_embs()

@@ -35,7 +35,7 @@ def tally_parameters(model):
     print('* number of parameters: %d' % n_params)
 
 
-def monolithic_compute_loss(iteration, model, target, target_lens, latent_values, latent_root, diff, dec_outputs, use_cuda, args, train=True,topics_dict=None,real_sentence=None,next_frames_dict=None,word_to_frame=None,template_dict=None,show=False):
+def monolithic_compute_loss(iteration, model, target, target_lens, latent_values, latent_root, diff, dec_outputs, use_cuda, args, train=True,topics_dict=None,real_sentence=None,next_frames_dict=None,word_to_frame=None,show=False):
     """
     use this function for validation loss. NO backprop in this function.
     """
@@ -52,13 +52,13 @@ def monolithic_compute_loss(iteration, model, target, target_lens, latent_values
 
     loss = ce_loss + q_log_q_total + frame_classifier_total
     if train==True and show==True:
-        print_iter_stats(iteration, loss, ce_loss, q_log_q_total,topics_dict,real_sentence,next_frames_dict,frame_classifier_total,word_to_frame,template_dict,args,show=True)
+        print_iter_stats(iteration, loss, ce_loss, q_log_q_total,topics_dict,real_sentence,next_frames_dict,frame_classifier_total,word_to_frame,args,show=True)
     return loss, ce_loss # tensor
 
 
 
 
-def print_iter_stats(iteration, loss, ce_loss, q_log_q_total,topics_dict,real_sentence,next_frames_dict,frame_classifier_total,word_to_frame,template_dict,args,show=False):
+def print_iter_stats(iteration, loss, ce_loss, q_log_q_total,topics_dict,real_sentence,next_frames_dict,frame_classifier_total,word_to_frame,args,show=False):
     if iteration%10==0:
         print("Iteration: ", iteration)
         print("Total: ", loss.cpu().data[0])
@@ -69,7 +69,6 @@ def print_iter_stats(iteration, loss, ce_loss, q_log_q_total,topics_dict,real_se
         if False:
             print("sentence: "," ".join(real_sentence))
             topics_to_md('chain: ',topics_dict)
-            templates=np.arange(args.template).reshape((-1,5))
             topics_to_md('words: ',word_to_frame)
             print('-'*50)
 
@@ -113,8 +112,8 @@ def classic_train(args,args_dict,args_info):
     args.total_frames=total_frames
     args.num_latent_values=args.total_frames
     print('total frames: ',args.total_frames)
+    experiment_name = 'SSDVAE_wotemp_{}_eps_{}_num_{}_seed_{}'.format('chain_event',str(args_dict['obsv_prob']),str(args_dict['exp_num']),str(args_dict['seed']))
 
-    # import wandb
     experiment_name = '{}_eps_{}_num_{}_seed_{}'.format('chain_event',str(args_dict['obsv_prob']),str(args_dict['exp_num']),str(args_dict['seed']))
 
     if args.use_pretrained:
@@ -142,7 +141,7 @@ def classic_train(args,args_dict,args_info):
         hidsize = (args.enc_hid_size, args.dec_hid_size)
         model = SSDVAE(args.emb_size, hidsize, vocab, latents, layers=args.nlayers, use_cuda=use_cuda,
                       pretrained=args.use_pretrained, dropout=args.dropout,frame_max=args.total_frames,
-                      template=args.template,latent_dim=args.latent_dim,verb_max_idx=verb_max_idx)
+                      latent_dim=args.latent_dim,verb_max_idx=verb_max_idx)
 
 
 
@@ -193,10 +192,10 @@ def classic_train(args,args_dict,args_info):
         model.zero_grad()
         latent_values, latent_root, diff, dec_outputs = model(batch, batch_lens,f_vals=f_vals)
 
-        topics_dict,real_sentence,next_frames_dict,word_to_frame,template_dict=show_inference(model,batch,vocab,vocab2,f_vals,f_ref,args)
+        topics_dict,real_sentence,next_frames_dict,word_to_frame=show_inference(model,batch,vocab,vocab2,f_vals,f_ref,args)
         loss, _ = monolithic_compute_loss(iteration, model, target, target_lens, latent_values, latent_root,
                                           diff, dec_outputs, use_cuda, args=args,topics_dict=topics_dict,real_sentence=real_sentence,next_frames_dict=next_frames_dict,
-                                          word_to_frame=word_to_frame,template_dict=template_dict,train=True,show=True)
+                                          word_to_frame=word_to_frame,train=True,show=True)
 
         # backward propagation
         loss.backward()
@@ -226,10 +225,10 @@ def classic_train(args,args_dict,args_info):
                         batch = Variable(batch)
                         f_vals = Variable(f_vals)
                     latent_values, latent_root, diff, dec_outputs = model(batch, batch_lens,f_vals=f_vals)
-                    topics_dict,real_sentence,next_frames_dict,word_to_frame,template_dict=show_inference(model,batch,vocab,vocab2,f_vals,f_ref,args)
+                    topics_dict,real_sentence,next_frames_dict,word_to_frame=show_inference(model,batch,vocab,vocab2,f_vals,f_ref,args)
                     loss, ce_loss = monolithic_compute_loss(iteration, model, target, target_lens, latent_values, latent_root,
                                                     diff, dec_outputs, use_cuda, args=args,topics_dict=topics_dict,real_sentence=real_sentence,next_frames_dict=next_frames_dict,
-                                                    word_to_frame=word_to_frame,template_dict=template_dict,train=False,show=False)
+                                                    word_to_frame=word_to_frame,train=False,show=False)
 
                     valid_loss = valid_loss + ce_loss.data.clone()
                     valid_logprobs+=ce_loss.data.clone().cpu().numpy()*target_lens.sum().cpu().data.numpy()
@@ -296,7 +295,6 @@ if __name__ == "__main__":
     parser.add_argument('--nohier', action='store_true', help='use the nohier model instead')
     parser.add_argument('--frame_max', type=int, default=500)
     parser.add_argument('--obsv_prob', type=float, default=1.0,help='the percentage of observing frames')
-    parser.add_argument('--template', type=int, default=20)
     parser.add_argument('--exp_num', type=int, default=1)
 
 
@@ -315,6 +313,8 @@ if __name__ == "__main__":
     args.vocab='./data/vocab_40064_verb_max_13572.pkl'
     args.frame_vocab_address='./data/vocab_frame_'+str(args.frame_max)+'.pkl'
     args.frame_vocab_ref='./data/vocab_frame_all.pkl'
+
+
     args.latent_dim=args.frame_max
     args.num_latent_values=args.frame_max
     args_info={}
@@ -340,7 +340,7 @@ if __name__ == "__main__":
 
     keys=["model","emb_size","nlayers",
          "lr","batch_size","num_clauses","num_latent_values",
-         "latent_dim","dropout","bidir","use_pretrained","obsv_prob","template","frame_max","exp_num","seed"]
+         "latent_dim","dropout","bidir","use_pretrained","obsv_prob","frame_max","exp_num","seed"]
     args_dict={key:str(value) for key,value in vars(args).items() if key in keys}
 
     classic_train(args,args_dict,args_info)

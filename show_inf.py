@@ -7,13 +7,6 @@ def show_inference(model,batch,vocab,vocab2,f_vals,f_ref,args):
     scores = model.scores[0,0,:,:].data.cpu().squeeze()
     _,scores = torch.sort(scores,-1,descending=True)
     scores = scores[:,:15]
-    template_embedding = model.template_to_frame.weight.data.cpu()
-    _,template_sort = torch.sort(template_embedding.t(),-1,descending=True)
-    template_sort=template_sort[:,:15]
-    template_dict={}
-    for k in range(template_sort.size(0)):
-        template_meaning = [vocab2.itos[int(v.numpy())] for v in template_sort[k,:]]
-        template_dict[k] = template_meaning
 
     latent_gumbels = model.latent_gumbels
     frames_to_frames = model.frames_to_frames
@@ -57,4 +50,4 @@ def show_inference(model,batch,vocab,vocab2,f_vals,f_ref,args):
     topics_dict['ref_frames'] += ["-"]*(15-len(topics_dict['ref_frames']))
     topics_dict['infered_frames'] += ["-"]*(15-len(topics_dict['fval_frames']))
     topics_dict['fval_frames'] += ["-"]*(15-len(topics_dict['fval_frames']))
-    return topics_dict,real_sentence,next_frames_dict,word_to_frame,template_dict
+    return topics_dict,real_sentence,next_frames_dict,word_to_frame

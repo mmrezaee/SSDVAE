@@ -83,7 +83,7 @@ class Decoder(EncDecBase):
         if self.input_feed is None:
             self.input_feed = feed
 
-    def forward(self, input, hidden, memory,template_decode_input):
+    def forward(self, input, hidden, memory):
         if self.drop is None:
             out = self.embeddings(input).view(input.shape[0], -1) #[batch, emb_size]
         else:
@@ -95,14 +95,14 @@ class Decoder(EncDecBase):
         rnn_output, hidden = self.rnn(dec_input, hidden) #rnn_output is hidden state of last layer
         #rnn_output dim is [batch, 1, hidden_size]
         rnn_output=torch.squeeze(rnn_output, dim=1)
-        dec_output, scores ,logit,frame_to_vocab= self.attention(rnn_output, memory,template_decode_input=template_decode_input)
+        dec_output, scores ,logit,frame_to_vocab= self.attention(rnn_output, memory)
         if self.drop is not None:
             dec_output = self.drop(dec_output)
         self.input_feed = dec_output #UPDATE Input Feed
         return dec_output, hidden, logit, frame_to_vocab
 
 class Attention(nn.Module):
-    def __init__(self, dim, use_cuda=True,is_decoder=False,vocab_size=None,is_latent=False,use_template=False,template_sample=None):
+    def __init__(self, dim, use_cuda=True,is_decoder=False,vocab_size=None,is_latent=False):
         super(Attention, self).__init__()
 
         if isinstance(dim, tuple):
@@ -119,7 +119,7 @@ class Attention(nn.Module):
             self.logits_out = nn.Linear(self.memory_dim, self.vocab_size, bias=False)
         self.use_cuda = use_cuda
 
-    def forward(self, input, memory, mem_lens=None,template_decode_input=None):
+    def forward(self, input, memory, mem_lens=None):
         batch, dim = input.shape 
         Wh = self.linear_in(input).unsqueeze(1) #[batch, 1, mem_dim]
         memory_t = memory.transpose(1,2) #[batch, dim, seq_len] 
@@ -146,9 +146,7 @@ class Attention(nn.Module):
         cat = F.tanh(context)+F.tanh(Wh.squeeze())
         attn_output = self.linear_out(cat)
         if self.is_decoder:       
-            self.template_input=template_decode_input
             logit = self.logits_out(cat)
-            logit += self.template_input
             frame_to_vocab = self.logits_out(F.tanh(memory))
             return attn_output, scores,logit , frame_to_vocab
 

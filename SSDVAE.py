@@ -18,7 +18,7 @@ import data_utils
 from data_utils import EOS_TOK, SOS_TOK, PAD_TOK, TUP_TOK
 
 class SSDVAE(nn.Module):
-    def __init__(self, emb_size, hsize, vocab, latents, cell_type="GRU", layers=2, bidir=True, pretrained=True, use_cuda=True, dropout=0.10,frame_max=None,template=None,latent_dim=None,latent_emb_dim=None,verb_max_idx=None):
+    def __init__(self, emb_size, hsize, vocab, latents, cell_type="GRU", layers=2, bidir=True, pretrained=True, use_cuda=True, dropout=0.10,frame_max=None,latent_dim=None,latent_emb_dim=None,verb_max_idx=None):
         """
         Args:
             emb_size (int) : size of input word embeddings
@@ -51,7 +51,6 @@ class SSDVAE(nn.Module):
         print('SSDVAE latent_dim: ',self.latent_dim)
         self.latent_emb_dim = latent_emb_dim
         self.frame_max=frame_max
-        self.template = template
         self.latents=latents
         self.use_cuda = use_cuda
         self.verb_max_idx = verb_max_idx
@@ -66,9 +65,6 @@ class SSDVAE(nn.Module):
             self.dec_hsize = hsize
         in_embedding = nn.Embedding(self.vocab_size, self.embd_size, padding_idx=self.pad_idx)
         out_embedding = nn.Embedding(self.vocab_size, self.embd_size, padding_idx=self.pad_idx)
-        self.template_to_frame = nn.Linear(self.template, self.frame_max,bias=False)
-        self.template_to_vocab = nn.Linear(self.frame_max, self.vocab_size,bias=False)
-        self.theta_layer=nn.Linear(self.layers*self.enc_hsize,self.template)
 
         if pretrained:
             print("Using Pretrained")
@@ -88,16 +84,12 @@ class SSDVAE(nn.Module):
             self.encoder = self.encoder.cuda()
             self.logits_out = self.logits_out.cuda()
             self.latent_in = self.latent_in.cuda()
-            self.theta_layer = self.theta_layer.cuda()
-            self.template_to_frame = self.template_to_frame.cuda()
-            self.template_to_vocab = self.template_to_vocab.cuda()
 
         else:
             self.decoder = self.decoder
             self.encoder = self.encoder
             self.logits_out = self.logits_out
             self.latent_in = self.latent_in
-            self.theta_layer = self.theta_layer
 
     def set_use_cuda(self, value):
         self.use_cuda = value
@@ -115,17 +107,14 @@ class SSDVAE(nn.Module):
         # INIT THE ENCODER
         ehidden = self.encoder.initHidden(batch_size)
         enc_output, ehidden = self.encoder(input, ehidden, seq_lens)
-        enc_theta = self.theta_layer(enc_output).mean(1) #[batch_size,template]
-        p_theta_sampled = F.softmax(enc_theta,-1).cuda()
-        template_input = F.tanh(self.template_to_frame(p_theta_sampled))
-        self.template_decode_input = self.template_to_vocab(template_input)
 
         if self.use_cuda:
             enc_output_avg = torch.sum(enc_output, dim=1) / Variable(seq_lens.view(-1, 1).type(torch.FloatTensor).cuda())
         else:
             enc_output_avg = torch.sum(enc_output, dim=1) / Variable(seq_lens.view(-1, 1).type(torch.FloatTensor))
         initial_query = enc_output_avg
-        latent_values, diffs,latent_embs,q_log_q ,frames_to_frames, frame_classifier, scores = self.latent_root.forward(enc_output, seq_lens, initial_query,f_vals,template_input=template_input) #[batch, num_clauses, num_frames]
+        latent_values, diffs,latent_embs,q_log_q ,frames_to_frames, frame_classifier, scores = self.latent_root.forward(enc_output, seq_lens, initial_query,f_vals) 
+        #[batch, num_clauses, num_frames]
         self.scores=scores
         self.latent_gumbels = latent_values
         self.frames_to_frames = frames_to_frames
@@ -182,7 +171,7 @@ class SSDVAE(nn.Module):
                     dec_input = Variable(tens)
             else:
                 dec_input = input[:, i-1]
-            dec_output, dhidden ,logit , frame_to_vocab = self.decoder(dec_input, dhidden,latent_embs,self.template_decode_input)
+            dec_output, dhidden ,logit , frame_to_vocab = self.decoder(dec_input, dhidden,latent_embs)
 
 
             dec_outputs += [dec_output]
