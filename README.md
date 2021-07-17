@@ -5,6 +5,16 @@ The implementation of NAACL 2021 paper
 <img src="figs/model.png" width="600" height="200"/><img src="figs/example.png" width="400"/> 
 
 This Pytorch code implements the model and reproduces the results from the paper.
+# Conda Environment:
+
+```
+conda create --name ssdvae
+conda install pytorch==0.4.1 cuda92 -c pytorch
+pip install torchtext==0.2.3
+conda install pandas scikit-learn
+conda install -c conda-forge pytablewriter
+```
+
 # Data:
 [Wikipedia Dataset](https://drive.google.com/file/d/1abSJI7Kbm_EaZfZYqTEGocwGVgX4_mBy/view?usp=sharing)
 
